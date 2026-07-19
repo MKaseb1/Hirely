@@ -1,0 +1,260 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// A person who logs into the Foundry admin tool.
+model User {
+  id           Int    @id @default(autoincrement())
+  email        String @unique
+  passwordHash String
+
+  emailVerified    Boolean   @default(false)
+  verificationCode String?
+  codeExpiresAt    DateTime?
+
+  refreshTokenHash String?
+
+  // "employee" is what every fresh signup becomes today — a self-service
+  // user scoped to their own linked Employee record (see `employee`
+  // relation below). "admin" is granted by root promoting an employee
+  // from the console (no self-registration path to it anymore). "root"
+  // is the single privileged account seeded from ADMIN_EMAIL/ADMIN_PASS
+  // env vars (see lib/rootAdmin.ts). The root can promote employees to
+  // admin and triage support requests; regular admins can't.
+  role String @default("employee")
+
+  // Legacy approval gate from the old "register -> pending admin approval"
+  // flow. Every account created today (employee signup, or an employee
+  // promoted to admin) is `true` from the moment it exists — there is no
+  // approval step left to gate on. Column kept only so existing rows /
+  // the login route's defensive check don't need a data migration.
+  approved Boolean @default(true)
+
+  // One-click login link sent by email the moment root approves a pending
+  // admin — lets them land straight on the dashboard from that email
+  // instead of going back to re-enter their password. Only the SHA-256
+  // hash is stored (same reasoning as refreshTokenHash: a DB leak
+  // shouldn't hand out usable login tokens), single-use (cleared once
+  // consumed in /api/auth/magic-login), and short-lived.
+  magicLoginTokenHash      String?
+  magicLoginTokenExpiresAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  supportRequests SupportRequest[]
+
+  // 1:1 link to this user's own HR record, created alongside the User row
+  // at signup (see app/api/auth/register/route.ts). Nullable + SetNull on
+  // the Employee side so an Employee row (real HR data) survives even if
+  // the login account is ever removed — it just becomes unlinked.
+  employee Employee?
+}
+
+// A message from a regular admin to the root admin — either reporting a
+// problem, requesting something (a feature, extra access, etc.), or the
+// catch-all "other". Pending admins can also submit these to appeal a
+// rejection or ask why they haven't been approved yet, so the FK is
+// intentionally onDelete: SetNull rather than Cascade — declining an
+// admin (which hard-deletes their User row) shouldn't erase the trail
+// of what they said to the root before that decision.
+model SupportRequest {
+  id      Int    @id @default(autoincrement())
+  type    String // "issue" | "request" | "other"
+  subject String
+  message String
+  status  String @default("open") // "open" | "resolved"
+
+  // The root's written response, set when they resolve the request —
+  // included in the "your request was resolved" email sent to
+  // submittedByEmail. Optional: root can resolve without writing
+  // anything and the email falls back to a generic notice. Left
+  // in place (not cleared) if the request is later reopened, so
+  // re-resolving doesn't lose what was already written.
+  rootReply String?
+
+  // Kept even after the submitter's User row is deleted, so root can still
+  // see who wrote what. Two fields (id + email snapshot) so we don't lose
+  // the humanly-recognizable identity when the FK nulls out.
+  submittedById    Int?
+  submittedByEmail String
+  submittedBy      User? @relation(fields: [submittedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+}
+
+// ============================================================
+// Employee data — the actual records being managed, validated,
+// and (eventually) matched against job openings.
+// ============================================================
+
+model Employee {
+  id               Int      @id @default(autoincrement())
+  fullName         String
+  phone            String?
+  birthDate        String?
+  nationality      String?
+  maritalStatus    String?
+  email            String?
+  workLocation     String?
+  gender           String?
+  // Unique so no two employees can share a national ID. Nullable-unique:
+  // SQLite allows many NULLs in a unique column, so employees genuinely
+  // without an ID on file still coexist — only real, populated values
+  // must be distinct.
+  nationalId       String?  @unique
+  militaryStatus   String?
+  // Company-issued personnel/badge number — distinct from nationalId
+  // (government ID). Same nullable-unique pattern.
+  companyID        String?  @unique
+  hiringDate       String?
+  position         String?
+  // Stored directly rather than derived from birthDate: some import
+  // sources (e.g. the Excel talent-profile template) give age without
+  // a birth date, and age alone can't be reversed into one.
+  age              Int?
+  // Tenure summary numbers from the same Excel template. Redundant with
+  // what could be derived from hiringDate + Experience entries, but the
+  // source data gives them as precomputed values, so they're stored
+  // as-is rather than recomputed.
+  yearsExpPrev     Int?
+  yearsExpElsewedy Int?
+  totalExperience  Int?
+  createdAt        DateTime @default(now())
+
+  // Links this HR record to the self-service login account that owns it.
+  // Created together with the User row at signup (a fresh employee always
+  // gets a blank Employee row, filled in later via the self-service view).
+  // Nullable + unique: most historical/imported records have no login at
+  // all, and at most one User can own a given Employee.
+  userId Int?  @unique
+  user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // These five are the "one employee, many entries" relationships —
+  // Prisma calls this a one-to-many relation. Each array field here
+  // doesn't store data itself; it just tells Prisma "look these up
+  // from the child table whenever asked."
+  experience         Experience[]
+  education          Education[]
+  certificates       Certificate[]
+  skills             Skill[]
+  performanceReviews PerformanceReview[]
+  reviewFlags        ReviewFlag[]
+  // EmployeeEmbeddingVec (vec0 virtual table) stores the Gemini embedding
+  // vector for job-matching — managed via raw SQL in lib/employeeCertificates.ts.
+}
+
+// A value the batch importer couldn't confidently accept, kept and written
+// anyway (as-is, unvalidated) rather than silently dropped — the admin
+// reviews and fixes it from the Dashboard instead of losing the record.
+model ReviewFlag {
+  id     Int @id @default(autoincrement())
+
+  // For a top-level Employee column: just the field name, e.g. "email".
+  // For a relation entry: "<relation>[<index>].<field>", e.g.
+  // "experience[0].startDate" — the index matches the entry's position in
+  // that employee's relation array at the time of import (relation rows
+  // don't get their own flaggable identity; this is a human-readable
+  // pointer, not a foreign key).
+  field    String
+  rawValue String
+  reason   String
+  resolved Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model Experience {
+  id          Int     @id @default(autoincrement())
+  jobTitle    String
+  company     String
+  startDate   String
+  endDate     String
+  description String?
+
+  // This is the actual foreign key — the column that stores WHICH
+  // employee this row belongs to. onDelete: Cascade means deleting
+  // an employee automatically deletes their experience rows too,
+  // instead of leaving orphaned data behind.
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model Education {
+  id             Int     @id @default(autoincrement())
+  degree         String
+  fieldOfStudy   String
+  institution    String
+  graduationYear Int
+  // Text, not a number — stores the scale alongside the value (e.g.
+  // "2.5/4.0 (American)"), since a bare "1.3" is genuinely ambiguous
+  // between an excellent German grade and a nearly-failing American one.
+  // Still optional — excluded from health scoring, as decided.
+  gpa            String?
+
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model Certificate {
+  id         Int     @id @default(autoincrement())
+  certName   String
+  issuer     String
+  issueDate  String
+  expiryDate String? // optional — excluded from health scoring, as decided
+  // Original unparsed source line, kept only for entries created via
+  // Excel import (e.g. the Training Historical Record freetext lists)
+  // so the admin can see what Gemini parsed the row from. Null for
+  // certificates entered any other way.
+  rawText    String?
+  // Relative path (under the local data/certificates/ folder — see
+  // app/api/employee/certificates/upload/route.ts) to the original
+  // uploaded image/PDF this entry was parsed from. Null for every
+  // certificate entered any other way (manual form entry, Excel import).
+  attachmentPath String?
+
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model Skill {
+  id          Int    @id @default(autoincrement())
+  category    String // "technical" or "language"
+  name        String
+  proficiency Int
+
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+// One row per quarter of appraisal score, parsed from the Excel
+// talent-profile template's "Performance appraisal history (%)" block.
+// Attendance Behavior from the same template is intentionally not
+// modeled yet — deferred per product decision.
+model PerformanceReview {
+  id      Int    @id @default(autoincrement())
+  quarter String // e.g. "Q1"
+  year    Int
+  score   Float // stored as a fraction, e.g. 0.95 for 95%
+
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+// EmployeeEmbeddingVec (vec0 virtual table) is defined via raw SQL in the
+// migration — Prisma does not support virtual tables. The table stores:
+//   employee_id INTEGER PRIMARY KEY
+//   isdirty INTEGER
+//   embedding FLOAT[3072] distance_metric=cosine
+//   +allexperience TEXT (auxiliary — for BM25 search)
