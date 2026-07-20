@@ -7,10 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendVerificationEmail } from "@/lib/mailer";
 import { findUserByEmail, updateUser } from "@/lib/users";
-
-function generateOtpCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
+import { generateOtpCode, OTP_TTL_MS } from "@/lib/otp";
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     const verificationCode = generateOtpCode();
-    const codeExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const codeExpiresAt = new Date(Date.now() + OTP_TTL_MS);
 
     updateUser(user.id, { verificationCode, codeExpiresAt });
 
