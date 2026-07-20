@@ -12,14 +12,7 @@ import { findUserByEmail, createUser, deleteUser } from "@/lib/users";
 import { createBlankEmployeeForUser, deleteEmployee } from "@/lib/employees";
 import { runInTransaction } from "@/lib/db";
 import { isRootEmail } from "@/lib/rootAdmin";
-
-// Generates a random 6-digit code, e.g. "482913".
-// Math.random() gives a decimal like 0.4829134..., multiplying by
-// 900000 and adding 100000 guarantees a 6-digit number every time
-// (never starts with a 0, never has fewer than 6 digits).
-function generateOtpCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
+import { generateOtpCode, OTP_TTL_MS } from "@/lib/otp";
 
 // POST handler — this function specifically runs for POST requests
 // to this route. Next.js looks for a function named exactly "POST"
@@ -64,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     // ---- Generate the OTP code and its expiry ----
     const verificationCode = generateOtpCode();
-    const codeExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+    const codeExpiresAt = new Date(Date.now() + OTP_TTL_MS);
 
     // ---- Create the user AND their linked (blank) Employee record, then
     // send the email ----
