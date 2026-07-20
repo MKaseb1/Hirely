@@ -569,6 +569,8 @@ function validateEducationEntries(entries: unknown): RelationCheck {
   return { entries: result, issues };
 }
 
+const ATTACHMENT_PATH_RE = /^certificates\/\d+\/[A-Za-z0-9._-]+$/;
+
 function validateCertificateEntries(entries: unknown): RelationCheck {
   const result: RelationEntryResult[] = [];
   const issues: FieldIssue[] = [];
@@ -606,7 +608,9 @@ function validateCertificateEntries(entries: unknown): RelationCheck {
     // which locally-saved file this was parsed from, if either) — no
     // shape to validate, just kept if present.
     if (isNonEmptyText(e.rawText)) data.rawText = e.rawText;
-    if (isNonEmptyText(e.attachmentPath)) data.attachmentPath = e.attachmentPath;
+    if (isNonEmptyText(e.attachmentPath) && ATTACHMENT_PATH_RE.test(e.attachmentPath)) {
+      data.attachmentPath = e.attachmentPath;
+    }
 
     result.push({ data, valid });
   });

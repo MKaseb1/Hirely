@@ -43,7 +43,12 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ certifi
     return NextResponse.json({ error: "You don't have access to that file." }, { status: 403 });
   }
 
-  const filePath = path.join(process.cwd(), "data", certificate.attachmentPath);
+  const root = path.join(process.cwd(), "data", "certificates");
+  const filePath = path.resolve(process.cwd(), "data", certificate.attachmentPath);
+  if (filePath !== root && !filePath.startsWith(root + path.sep)) {
+    return NextResponse.json({ error: "Invalid attachment path." }, { status: 400 });
+  }
+
   let buffer: Buffer;
   try {
     buffer = await fs.readFile(filePath);
