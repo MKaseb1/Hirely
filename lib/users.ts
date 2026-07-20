@@ -15,6 +15,7 @@ export interface User {
   emailVerified: boolean;
   verificationCode: string | null;
   codeExpiresAt: Date | null;
+  verificationAttempts: number;
   refreshTokenHash: string | null;
   role: Role;
   approved: boolean;
@@ -30,6 +31,7 @@ interface UserRow {
   emailVerified: number;
   verificationCode: string | null;
   codeExpiresAt: string | null;
+  verificationAttempts: number;
   refreshTokenHash: string | null;
   role: string;
   approved: number;
@@ -46,6 +48,7 @@ function mapUser(row: UserRow): User {
     emailVerified: !!row.emailVerified,
     verificationCode: row.verificationCode,
     codeExpiresAt: row.codeExpiresAt ? new Date(row.codeExpiresAt) : null,
+    verificationAttempts: row.verificationAttempts,
     refreshTokenHash: row.refreshTokenHash,
     role: row.role as Role,
     approved: !!row.approved,
@@ -106,6 +109,7 @@ export function updateUser(
     emailVerified: boolean;
     verificationCode: string | null;
     codeExpiresAt: Date | null;
+    verificationAttempts: number;
     refreshTokenHash: string | null;
     role: Role;
     approved: boolean;
