@@ -157,13 +157,13 @@ async function extractJobRequirements(jobDescription: string): Promise<Structure
   }
 }
 
-const RELEVANCE_SCALE = 1.15;
+const RELEVANCE_SCALE = 1.2;
 const RELEVANCE_CAP = 0.95;
 
 // UI-facing relevance score, derived purely from semantic cosine similarity
 // (not the fused BM25/semantic ranking score). Scaled up slightly and capped
 // so it reads better as a percentage in the UI.
-const RELEVANCE_SCALE_THRESHOLD = 0.5;
+const RELEVANCE_SCALE_THRESHOLD = 0.55;
 
 function computeRelevanceScore(similarity: number): number {
   if (similarity <= RELEVANCE_SCALE_THRESHOLD) return similarity;
