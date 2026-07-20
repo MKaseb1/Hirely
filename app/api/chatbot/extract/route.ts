@@ -32,6 +32,7 @@ function findNextMissingField(data: Record<string, unknown>): string | undefined
 }
 
 function stripInternal(data: Record<string, unknown>) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { __skipped, ...rest } = data;
   return rest;
 }
@@ -186,6 +187,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { intent, identifierHint, ...rawData } = extracted;
     const { cleaned: newData, warnings } = validateExtractedFields(rawData);
 

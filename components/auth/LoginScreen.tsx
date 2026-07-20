@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, FormEvent, useRef } from 'react';
+import { useState, useEffect, useSyncExternalStore, FormEvent, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -29,24 +29,15 @@ export default function LoginScreen({ onSwitchToRegister }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(
+    searchParams.get('magicLoginError')
+      ? 'That sign-in link has expired or was already used. Please log in below.'
+      : '',
+  );
   const [isLoading, setIsLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [supportOpen, setSupportOpen] = useState(false);
   const submittingRef = useRef(false);
-
-  useEffect(() => { setMounted(true); }, []);
-
-  // Landed here from an approval email's magic-login link that turned out
-  // to be expired or already used (e.g. clicked twice, or a corporate
-  // email scanner pre-fetched it) — the link itself redirects here with
-  // this flag rather than failing silently, so the fallback path (a
-  // normal password login) doesn't leave them wondering what happened.
-  useEffect(() => {
-    if (searchParams.get('magicLoginError')) {
-      setError('That sign-in link has expired or was already used. Please log in below.');
-    }
-  }, [searchParams]);
 
   // If a verification is already pending (e.g. from a previous register
   // attempt), send the user to the register page, which handles the

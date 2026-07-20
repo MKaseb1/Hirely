@@ -160,11 +160,11 @@ export default function AdminConsoleView({ pending, requests }: { pending: Pendi
         {emailWarningId?.startsWith('approve:') && (
           <p className="text-xs mb-3 flex items-center gap-1.5" style={{ color: COLORS.amber }}>
             <FontAwesomeIcon icon={faTriangleExclamation} className="text-[10px]" />
-            Account approved, but the sign-in email couldn't be sent — they'll need to log in with their password instead.
+            Account approved, but the sign-in email couldn&apos;t be sent — they&apos;ll need to log in with their password instead.
           </p>
         )}
         {pending.length === 0 ? (
-          <p className="text-sm" style={{ color: COLORS.gray }}>Nobody's waiting. All caught up.</p>
+          <p className="text-sm" style={{ color: COLORS.gray }}>Nobody&apos;s waiting. All caught up.</p>
         ) : (
           <div className="divide-y" style={{ borderColor: '#F3F4F6' }}>
             {pending.map((u) => (
@@ -264,7 +264,7 @@ export default function AdminConsoleView({ pending, requests }: { pending: Pendi
                       )}
                       {emailWarningId === `sr:${r.id}` && (
                         <p className="text-xs mt-2" style={{ color: COLORS.amber }}>
-                          Marked resolved, but the notification email couldn't be sent — check the server logs.
+                          Marked resolved, but the notification email couldn&apos;t be sent — check the server logs.
                         </p>
                       )}
                       {replyingId === r.id && (

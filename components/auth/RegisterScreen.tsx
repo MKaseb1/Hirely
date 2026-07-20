@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, FormEvent } from 'react';
+import { useState, useEffect, useRef, useSyncExternalStore, useMemo, FormEvent } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faFire,
@@ -33,7 +33,7 @@ export default function RegisterScreen({ onSwitchToLogin }: RegisterScreenProps)
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [supportOpen, setSupportOpen] = useState(false);
 
   // OTP step-2 state — identical mechanics to the real product.
@@ -41,29 +41,32 @@ export default function RegisterScreen({ onSwitchToLogin }: RegisterScreenProps)
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [ttlLeft, setTtlLeft] = useState(0);
-  const [ttlDisplay, setTtlDisplay] = useState('02:00');
+  const [ttlLeft, setTtlLeft] = useState(pendingVerification?.ttl ?? 0);
   const codeInputRef = useRef<HTMLInputElement>(null);
+  const [prevPendingVerification, setPrevPendingVerification] = useState(pendingVerification);
 
-  useEffect(() => { setMounted(true); }, []);
+  if (pendingVerification !== prevPendingVerification) {
+    setPrevPendingVerification(pendingVerification);
+    setTtlLeft(pendingVerification?.ttl ?? 0);
+  }
 
   useEffect(() => {
     if (!pendingVerification) return;
-    setTtlLeft(pendingVerification.ttl);
     const t = setTimeout(() => codeInputRef.current?.focus(), 50);
     return () => clearTimeout(t);
   }, [pendingVerification]);
 
   useEffect(() => {
-    if (ttlLeft <= 0) {
-      setTtlDisplay('00:00');
-      return;
-    }
-    const mm = String(Math.floor(ttlLeft / 60)).padStart(2, '0');
-    const ss = String(ttlLeft % 60).padStart(2, '0');
-    setTtlDisplay(`${mm}:${ss}`);
+    if (ttlLeft <= 0) return;
     const id = setInterval(() => setTtlLeft(t => Math.max(0, t - 1)), 1000);
     return () => clearInterval(id);
+  }, [ttlLeft]);
+
+  const ttlDisplay = useMemo(() => {
+    if (ttlLeft <= 0) return '00:00';
+    const mm = String(Math.floor(ttlLeft / 60)).padStart(2, '0');
+    const ss = String(ttlLeft % 60).padStart(2, '0');
+    return `${mm}:${ss}`;
   }, [ttlLeft]);
 
   useEffect(() => {

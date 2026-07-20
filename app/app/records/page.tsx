@@ -22,6 +22,7 @@ export default async function RecordsPage() {
 
   // Strip createdAt (a Date object) before handing this to the Client
   // Component — only plain serializable data can cross that boundary.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const serialized = employees.map(({ createdAt, ...rest }) => rest);
 
   // RecordsView reads ?highlight= via useSearchParams (to deep-link from the

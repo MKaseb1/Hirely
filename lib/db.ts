@@ -11,14 +11,12 @@
 // dev-only dependencies, never installed in production.
 
 import Database from "better-sqlite3";
-import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
 
 // Sentinel to confirm THIS file is executing, not a stale cached version.
 console.log("[db.ts] loaded", Date.now());
 
-const require = createRequire(import.meta.url);
 
 function resolveDbPath(): string {
   const url = process.env.DATABASE_URL || "file:./dev.db";

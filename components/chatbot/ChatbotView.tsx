@@ -25,7 +25,7 @@ import { BASIC_INFO_FIELDS, BASIC_INFO_LABELS } from '@/lib/tabConfig';
 import { useAuth } from '@/context/AuthContext';
 import EmployeeForm, { type BuiltEmployeeData, type SubmitResult } from '@/components/shared/EmployeeForm';
 import BatchImportModal from '@/components/shared/BatchImportModal';
-import Logo from '@/components/shared/Logo';
+
 
 const RELATION_LABELS: Record<string, string> = {
   experience: 'Experience', education: 'Education',
@@ -354,7 +354,7 @@ function ConfirmationCard({
             style={{ backgroundColor: COLORS.red }}
           >
             <FontAwesomeIcon icon={faCheck} className="text-xs" />
-            Yes, that's who I mean
+            Yes, that&apos;s who I mean
           </button>
           <button
             onClick={() => onConfirmIdentity(false)}
@@ -372,7 +372,7 @@ function ConfirmationCard({
   if (pending.action === 'askIdentity') {
     return (
       <div className="rounded-lg border p-4 text-sm" style={{ borderColor: COLORS.border, color: COLORS.gray }}>
-        I'm not sure who you mean — could you tell me their name or ID?
+        I&apos;m not sure who you mean — could you tell me their name or ID?
       </div>
     );
   }
@@ -449,14 +449,14 @@ function ConfirmationCard({
           </p>
         </div>
         <p className="text-xs mb-3" style={{ color: COLORS.gray }}>
-          Type "skip" to leave this blank for now.
+          Type &quot;skip&quot; to leave this blank for now.
         </p>
         <button
           onClick={onCreateAnyway}
           className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-gray-50"
           style={{ borderColor: COLORS.border, color: COLORS.gray }}
         >
-          Create anyway, with what I've got
+          Create anyway, with what I&apos;ve got
         </button>
       </div>
     );
@@ -469,14 +469,14 @@ function ConfirmationCard({
           <p className="text-xs" style={{ color: COLORS.red }}>{pending.reason}</p>
         </div>
         <p className="text-sm font-medium mb-3" style={{ color: COLORS.black }}>
-          {FIELD_QUESTIONS[pending.field] ?? `What's the ${BASIC_INFO_LABELS[pending.field]}?`}
+          {FIELD_QUESTIONS[pending.field] ?? `What&apos;s the ${BASIC_INFO_LABELS[pending.field]}?`}
         </p>
         <button
           onClick={onCreateAnyway}
           className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-gray-50"
           style={{ borderColor: COLORS.border, color: COLORS.gray }}
         >
-          Create anyway, with what I've got
+          Create anyway, with what I&apos;ve got
         </button>
       </div>
     );

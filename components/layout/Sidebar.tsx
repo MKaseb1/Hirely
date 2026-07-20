@@ -15,7 +15,7 @@ import {
   faGaugeHigh,
   faTableList,
   faComments,
-  faGear,
+
   faRightFromBracket,
   faChevronLeft,
   faChevronRight,
