@@ -143,8 +143,8 @@ async function extractJobRequirements(jobDescription: string): Promise<Structure
     const structuredData: StructuredJobRequirements = {
       nationality: parsed.nationality ?? null,
       gender: parsed.gender ?? null,
-      totalExperience: parsed.totalExperience ? Number(parsed.totalExperience) : null,
-      yearsExpElsewedy: parsed.yearsExpElsewedy ? Number(parsed.yearsExpElsewedy) : null,
+      totalExperience: parsed.totalExperience != null ? Number(parsed.totalExperience) : null,
+      yearsExpElsewedy: parsed.yearsExpElsewedy != null ? Number(parsed.yearsExpElsewedy) : null,
       requirementText: parsed.requirementText?.trim() || jobDescription.trim(),
     };
 
