@@ -21,6 +21,14 @@ type StructuredJobRequirements = {
   requirementText: string;
 };
 
+type MatchProfileResult = {
+  employeeId: number;
+  text: string;
+  parsedRequirements: StructuredJobRequirements;
+  relevanceScore: number;
+  semanticDegraded: boolean;
+};
+
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
@@ -204,7 +212,7 @@ function rrfFusion(
 export async function matchTopProfiles(
   jobDescription: string,
   topN?: number
-) {
+): Promise<MatchProfileResult[]> {
   const requirements = await extractJobRequirements(jobDescription);
   const searchText = buildRequirementText(requirements);
 
@@ -272,15 +280,25 @@ export async function matchTopProfiles(
   const bm25Scores = bm25.getScores(tokenize(searchText));
   const bm25Ranking = getSortedIndices(bm25Scores);
 
-  const queryVec = await embedText(searchText);
-  const semanticScores = dbProfiles.map((profile) => {
-    let profileVec: number[] = [];
-    if (profile.embedding) {
-      const buf = profile.embedding instanceof Buffer ? profile.embedding : Buffer.from(profile.embedding);
-      profileVec = Array.from(new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4));
-    }
-    return cosineSimilarity(queryVec, profileVec);
-  });
+  let semanticScores: number[];
+  let semanticDegraded = false;
+
+  try {
+    const queryVec = await embedText(searchText);
+    semanticScores = dbProfiles.map((profile) => {
+      let profileVec: number[] = [];
+      if (profile.embedding) {
+        const buf = profile.embedding instanceof Buffer ? profile.embedding : Buffer.from(profile.embedding);
+        profileVec = Array.from(new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4));
+      }
+      return cosineSimilarity(queryVec, profileVec);
+    });
+  } catch (error) {
+    console.error("Failed to compute query embedding, falling back to keyword-only search", error);
+    semanticScores = new Array(dbProfiles.length).fill(0);
+    semanticDegraded = true;
+  }
+
   const semanticRanking = getSortedIndices(semanticScores);
 
   const fused = rrfFusion(bm25Ranking, semanticRanking, dbProfiles.length);
@@ -288,11 +306,12 @@ export async function matchTopProfiles(
   const limit = topN ?? Math.max(1, Math.ceil(dbProfiles.length * 0.15));
   const topMatches = fused.slice(0, limit);
 
-  const results = topMatches.map((match) => ({
+  const results: MatchProfileResult[] = topMatches.map((match) => ({
     employeeId: Number(dbProfiles[match.docIdx].employee_id),
     text: dbProfiles[match.docIdx].allexperience ?? "",
     parsedRequirements: requirements,
     relevanceScore: computeRelevanceScore(semanticScores[match.docIdx]),
+    semanticDegraded,
   }));
 
   // Candidate selection (which topN profiles make the cut) still comes from
