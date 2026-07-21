@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findUserByEmail, updateUser } from "@/lib/users";
 import { signTokenPair, setAuthCookies } from "@/lib/authTokens";
+import { rateLimit } from "@/lib/rateLimit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,6 +13,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Email and code are required." },
         { status: 400 }
+      );
+    }
+
+    if (!rateLimit(`verify:${email}`, 10, 5 * 60 * 1000)) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please wait and try again." },
+        { status: 429 }
       );
     }
 
@@ -29,6 +37,16 @@ export async function POST(request: NextRequest) {
 
     // ---- Check the code matches ----
     if (user.verificationCode !== code) {
+      const attempts = user.verificationAttempts + 1;
+      if (attempts >= 5) {
+        updateUser(user.id, {
+          verificationCode: null,
+          codeExpiresAt: null,
+          verificationAttempts: attempts,
+        });
+      } else {
+        updateUser(user.id, { verificationAttempts: attempts });
+      }
       return NextResponse.json(
         { error: "Invalid or expired code." },
         { status: 400 }
@@ -63,6 +81,7 @@ export async function POST(request: NextRequest) {
       emailVerified: true,
       verificationCode: null,
       codeExpiresAt: null,
+      verificationAttempts: 0,
       refreshTokenHash,
     });
 

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendVerificationEmail } from "@/lib/mailer";
 import { findUserByEmail, updateUser } from "@/lib/users";
 import { generateOtpCode, OTP_TTL_MS } from "@/lib/otp";
+import { rateLimit } from "@/lib/rateLimit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,6 +16,13 @@ export async function POST(request: NextRequest) {
 
     if (!email) {
       return NextResponse.json({ error: "Email is required." }, { status: 400 });
+    }
+
+    if (!rateLimit(`resend:${email}`, 3, 10 * 60 * 1000)) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please wait and try again." },
+        { status: 429 }
+      );
     }
 
     const user = findUserByEmail(email);

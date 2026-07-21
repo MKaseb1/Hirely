@@ -21,6 +21,7 @@ model User {
   emailVerified    Boolean   @default(false)
   verificationCode String?
   codeExpiresAt    DateTime?
+  verificationAttempts Int @default(0)
 
   refreshTokenHash String?
 
