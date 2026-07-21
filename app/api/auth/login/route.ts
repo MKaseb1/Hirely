@@ -6,6 +6,7 @@ import { findUserByEmail, updateUser } from "@/lib/users";
 import { signTokenPair, setAuthCookies } from "@/lib/authTokens";
 import { sendVerificationEmail } from "@/lib/mailer";
 import { ensureRootAdminFromEnv, isRootEmail } from "@/lib/rootAdmin";
+import { generateOtpCode, OTP_TTL_MS } from "@/lib/otp";
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,8 +57,8 @@ export async function POST(request: NextRequest) {
     if (!user.emailVerified) {
       // Generate a FRESH code, since any old one may have already expired
       // (exactly the trap you hit testing verify-code a minute ago).
-      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const codeExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      const verificationCode = generateOtpCode();
+      const codeExpiresAt = new Date(Date.now() + OTP_TTL_MS);
 
       updateUser(user.id, { verificationCode, codeExpiresAt });
 
