@@ -241,7 +241,7 @@ export async function matchTopProfiles(
 
   const employeeIds = employees.map((employee) => employee.id);
   if (employeeIds.length === 0) {
-    return [];
+    return { results: [], pendingSyncCount: 0 };
   }
 
   const { sql: idsSql, params: idsParams } = inClause(employeeIds);
@@ -256,8 +256,14 @@ export async function matchTopProfiles(
   }[];
 
   if (!dbProfiles || dbProfiles.length === 0) {
-    return [];
+    return { results: [], pendingSyncCount: 0 };
   }
+
+  const pendingSyncCount = db.prepare(`
+    SELECT COUNT(*) AS cnt FROM "EmployeeEmbeddingVec"
+    WHERE "employee_id" IN ${idsSql} AND "isdirty" = 1
+  `).get(...idsParams) as { cnt: number } | undefined;
+  const dirtyCount = pendingSyncCount?.cnt ?? 0;
 
   const profileTexts = dbProfiles.map((p) => p.allexperience || "");
 
@@ -295,5 +301,10 @@ export async function matchTopProfiles(
   // top-to-bottom matches the percentages it prints.
   results.sort((a, b) => b.relevanceScore - a.relevanceScore);
 
-  return results;
+  // pendingSyncCount reports how many candidate profiles have isdirty = 1
+  // (stale or zero-vector embeddings that haven't been re-embedded yet).
+  // This is purely informational — no inline sync is triggered here.
+  // Dirty/new employees will score 0 until the next scheduled sync job runs.
+  // See scripts/run-embeddings.ts for the daily-job entry point.
+  return { results, pendingSyncCount: dirtyCount };
 }
