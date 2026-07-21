@@ -212,7 +212,7 @@ function rrfFusion(
 export async function matchTopProfiles(
   jobDescription: string,
   topN?: number
-): Promise<MatchProfileResult[]> {
+): Promise<{ results: MatchProfileResult[]; pendingSyncCount: number }> {
   const requirements = await extractJobRequirements(jobDescription);
   const searchText = buildRequirementText(requirements);
 
