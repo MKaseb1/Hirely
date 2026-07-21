@@ -19,6 +19,7 @@ import { createContext, useContext, useState, useCallback, useEffect, ReactNode 
 import type { Role } from '@/lib/roles';
 
 const PENDING_VERIFICATION_KEY = 'foundry-pending-verification';
+const PENDING_APPROVAL_KEY = 'foundry-pending-approval';
 
 // sessionStorage only exists in the browser, not during server-side
 // rendering — this guards against crashing when Next.js renders on the
@@ -32,6 +33,10 @@ const storage = typeof window !== 'undefined' ? window.sessionStorage : null;
 export interface PendingVerification {
   email: string;
   ttl: number;
+}
+
+export interface PendingApproval {
+  email: string;
 }
 
 export interface User {
@@ -65,6 +70,8 @@ interface AuthContextType {
   verifyCode: (email: string, code: string) => Promise<AuthOutcome>;
   resendCode: (email: string) => Promise<void>;
   clearPendingVerification: () => void;
+  pendingApproval: PendingApproval | null;
+  clearPendingApproval: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -80,6 +87,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const raw = storage?.getItem(PENDING_VERIFICATION_KEY);
       return raw ? (JSON.parse(raw) as PendingVerification) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(() => {
+    try {
+      const raw = storage?.getItem(PENDING_APPROVAL_KEY);
+      return raw ? (JSON.parse(raw) as PendingApproval) : null;
     } catch {
       return null;
     }
@@ -124,6 +139,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       storage?.removeItem(PENDING_VERIFICATION_KEY);
     }
   }, [pendingVerification, isHydrated]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    if (pendingApproval) {
+      storage?.setItem(PENDING_APPROVAL_KEY, JSON.stringify(pendingApproval));
+    } else {
+      storage?.removeItem(PENDING_APPROVAL_KEY);
+    }
+  }, [pendingApproval, isHydrated]);
 
   // ---- authFetch: cookies are attached automatically by the browser now,
   // so this no longer manages a token — it just retries once through
@@ -211,6 +235,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPendingVerification(null);
   }, []);
 
+  const clearPendingApproval = useCallback(() => {
+    setPendingApproval(null);
+  }, []);
+
   // ---- logout ----
   // Now a real server call: client-side JS can't read or clear an
   // httpOnly cookie itself, so logging out has to ask the server to
@@ -219,6 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     setUser(null);
     setPendingVerification(null);
+    setPendingApproval(null);
   }, []);
 
   return (
@@ -235,6 +264,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         verifyCode,
         resendCode,
         clearPendingVerification,
+        pendingApproval,
+        clearPendingApproval,
       }}
     >
       {children}
