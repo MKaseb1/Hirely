@@ -1,5 +1,5 @@
 import { db, inClause } from "./db";
-import { embedText, EMBEDDING_DIM } from "./embedding";
+import { embedTexts, EMBEDDING_DIM } from "./embedding";
 
 export async function getEmployeeCombinedCorpusMap(targetEmployeeIds?: number[]): Promise<Record<number, string>> {
   if (targetEmployeeIds && targetEmployeeIds.length === 0) {
@@ -146,17 +146,24 @@ export async function populateEmployeeEmbeddingsFromCertificates(): Promise<numb
     `UPDATE "EmployeeEmbeddingVec" SET "allexperience" = ?, "embedding" = ?, "isdirty" = 0 WHERE "employee_id" = ?`
   );
 
+  const batchMap: { employeeId: number; text: string }[] = [];
   for (const employeeId of dirtyIds) {
     const text = textMap[employeeId];
-
     if (!text) {
       updateStmt.run("", ZERO_VEC, BigInt(employeeId));
       continue;
     }
+    batchMap.push({ employeeId, text });
+  }
 
-    const embedding = await embedText(text);
+  const texts = batchMap.map((e) => e.text);
+  const embeddings = await embedTexts(texts);
+
+  for (let i = 0; i < batchMap.length; i++) {
+    const { employeeId, text } = batchMap[i];
+    const embedding = embeddings[i];
+    if (!embedding || embedding.length === 0) continue;
     const vecBuf = Buffer.from(new Float32Array(embedding).buffer);
-
     updateStmt.run(text, vecBuf, BigInt(employeeId));
     processedCount += 1;
   }
