@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { db, inClause } from "./db";
 import { embedText } from "./embedding";
+import { embedTextsBGE } from "./bgeEmbedding";
 
 const SEMANTIC_WEIGHT = 0.7;
 const BM25_WEIGHT = 0.3;
@@ -282,6 +283,7 @@ export async function matchTopProfiles(
 
   let semanticScores: number[];
   let semanticDegraded = false;
+  const limit = topN ?? Math.max(1, Math.ceil(dbProfiles.length * 0.15));
 
   try {
     const queryVec = await embedText(searchText);
@@ -294,16 +296,29 @@ export async function matchTopProfiles(
       return cosineSimilarity(queryVec, profileVec);
     });
   } catch (error) {
-    console.error("Failed to compute query embedding, falling back to keyword-only search", error);
-    semanticScores = new Array(dbProfiles.length).fill(0);
-    semanticDegraded = true;
+    console.error("Gemini embedding failed, attempting local BGE fallback", error);
+    try {
+      const bm25OnlyRanking = getSortedIndices(bm25Scores);
+      const shortlistIndices = bm25OnlyRanking.slice(0, limit);
+      const shortlistTexts = shortlistIndices.map((i) => profileTexts[i]);
+      const [queryVec, ...profileVecs] = await embedTextsBGE([searchText, ...shortlistTexts]);
+      semanticScores = new Array(dbProfiles.length).fill(0);
+      shortlistIndices.forEach((docIdx, i) => {
+        semanticScores[docIdx] = cosineSimilarity(queryVec, profileVecs[i]);
+      });
+      console.log(`BGE fallback succeeded — using local embeddings for ${shortlistIndices.length} candidates`);
+    } catch (bgeError) {
+      console.error("BGE fallback also failed, falling back to keyword-only search", bgeError);
+      console.error("Gemini error:", error);
+      semanticScores = new Array(dbProfiles.length).fill(0);
+      semanticDegraded = true;
+    }
   }
 
   const semanticRanking = getSortedIndices(semanticScores);
 
   const fused = rrfFusion(bm25Ranking, semanticRanking, dbProfiles.length);
 
-  const limit = topN ?? Math.max(1, Math.ceil(dbProfiles.length * 0.15));
   const topMatches = fused.slice(0, limit);
 
   const results: MatchProfileResult[] = topMatches.map((match) => ({
