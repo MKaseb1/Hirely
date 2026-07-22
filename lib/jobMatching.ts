@@ -28,8 +28,13 @@ type MatchProfileResult = {
   text: string;
   parsedRequirements: StructuredJobRequirements;
   relevanceScore: number;
-  semanticDegraded: boolean;
 };
+
+export interface MatchTopProfilesResult {
+  results: MatchProfileResult[];
+  pendingSyncCount: number;
+  semanticDegraded: boolean;
+}
 
 function tokenize(text: string): string[] {
   return text
@@ -214,7 +219,7 @@ function rrfFusion(
 export async function matchTopProfiles(
   jobDescription: string,
   topN?: number
-): Promise<{ results: MatchProfileResult[]; pendingSyncCount: number }> {
+): Promise<MatchTopProfilesResult> {
   const requirements = await extractJobRequirements(jobDescription);
   const searchText = buildRequirementText(requirements);
 
@@ -251,7 +256,7 @@ export async function matchTopProfiles(
 
   const employeeIds = employees.map((employee) => employee.id);
   if (employeeIds.length === 0) {
-    return { results: [], pendingSyncCount: 0 };
+    return { results: [], pendingSyncCount: 0, semanticDegraded: false };
   }
 
   const { sql: idsSql, params: idsParams } = inClause(employeeIds);
@@ -284,7 +289,7 @@ export async function matchTopProfiles(
   }[];
 
   if (!dbProfiles || dbProfiles.length === 0) {
-    return { results: [], pendingSyncCount: 0 };
+    return { results: [], pendingSyncCount: 0, semanticDegraded: false };
   }
 
   const profileTexts = dbProfiles.map((p) => p.allexperience || "");
@@ -339,10 +344,9 @@ export async function matchTopProfiles(
     text: dbProfiles[match.docIdx].allexperience ?? "",
     parsedRequirements: requirements,
     relevanceScore: computeRelevanceScore(semanticScores[match.docIdx]),
-    semanticDegraded,
   }));
 
   results.sort((a, b) => b.relevanceScore - a.relevanceScore);
 
-  return { results, pendingSyncCount: dirtyCountBefore };
+  return { results, pendingSyncCount: dirtyCountBefore, semanticDegraded };
 }

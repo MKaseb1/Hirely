@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { results: matches, pendingSyncCount } = await matchTopProfiles(jobDescription.trim(), topN);
+    const { results: matches, pendingSyncCount, semanticDegraded } = await matchTopProfiles(jobDescription.trim(), topN);
 
     const employeeIds = matches.map((m) => m.employeeId);
     const { sql, params } = inClause(employeeIds);
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       employee: employeeMap.get(m.employeeId) ?? null,
     }));
 
-    return NextResponse.json({ results, pendingSyncCount });
+    return NextResponse.json({ results, pendingSyncCount, semanticDegraded });
   } catch (error) {
     console.error("Job matching error:", error);
     return NextResponse.json(
