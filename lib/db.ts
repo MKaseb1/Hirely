@@ -14,8 +14,6 @@ import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 
-// Sentinel to confirm THIS file is executing, not a stale cached version.
-console.log("[db.ts] loaded", Date.now());
 
 
 function resolveDbPath(): string {

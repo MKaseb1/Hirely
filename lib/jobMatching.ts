@@ -3,6 +3,7 @@ import { db, inClause } from "./db";
 import { embedText } from "./embedding";
 import { embedTextsBGE } from "./bgeEmbedding";
 import { populateEmployeeEmbeddingsFromCertificates } from "./employeeCertificates";
+import { EXTRACTION_MODEL } from "./aiModels";
 
 const SEMANTIC_WEIGHT = 0.7;
 const BM25_WEIGHT = 0.3;
@@ -142,7 +143,7 @@ async function extractJobRequirements(jobDescription: string): Promise<Structure
     ${jobDescription}`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: EXTRACTION_MODEL,
       contents: prompt,
     });
 

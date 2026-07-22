@@ -6,6 +6,7 @@
 // same thing everywhere in the app — one shape, three places it's used.
 
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { CHAT_MODEL, CHAT_LITE_MODEL } from "./aiModels";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -193,7 +194,7 @@ async function runEmployeeExtraction(
       // experience/education/certificates/skills were added back in).
       // Full Flash's extra internal reasoning step is worth the token cost
       // here, since this writes to a real employee record.
-      model: "gemini-flash-latest",
+      model: CHAT_MODEL,
       contents,
       config: {
         systemInstruction,
@@ -285,7 +286,7 @@ export async function extractSingleField(field: string, message: string): Promis
       // scarce 20 requests; Flash-Lite's is roughly 1,500 — and this
       // function fires once per question in the one-by-one flow, so it's
       // the highest-volume call in the whole chatbot.
-      model: "gemini-flash-lite-latest",
+      model: CHAT_LITE_MODEL,
       contents: `The admin was asked to provide the employee's ${field}. Their reply: "${message}"`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -337,7 +338,7 @@ const CERTIFICATE_EXTRACTION_SCHEMA = {
 export async function extractCertificateFromFile(fileBuffer: Buffer, mimeType: string): Promise<ExtractedCertificateData> {
   const response = await withTimeout(
     ai.models.generateContent({
-      model: "gemini-flash-latest",
+      model: CHAT_MODEL,
       contents: [
         {
           role: "user",

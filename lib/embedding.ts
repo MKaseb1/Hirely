@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { EMBEDDING_MODEL } from "./aiModels";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -9,7 +10,7 @@ const BATCH_SIZE = 100;
 export async function embedText(text: string): Promise<number[]> {
   if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
   const response = await ai.models.embedContent({
-    model: "gemini-embedding-2",
+    model: EMBEDDING_MODEL,
     contents: text,
   });
   return response.embeddings?.[0]?.values ?? [];
@@ -24,7 +25,7 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
     const chunk = texts.slice(i, i + BATCH_SIZE);
     const response = await ai.models.embedContent({
-      model: "gemini-embedding-2",
+      model: EMBEDDING_MODEL,
       contents: chunk,
     });
     const embeddings = response.embeddings ?? [];
