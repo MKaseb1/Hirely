@@ -116,14 +116,8 @@ export function markEmployeeEmbeddingDirty(employeeId: number): void {
   }
 }
 
-export async function populateEmployeeEmbeddingsFromCertificates(targetEmployeeIds?: number[]): Promise<number> {
-  let employeeIds: number[];
-  if (targetEmployeeIds) {
-    employeeIds = targetEmployeeIds;
-  } else {
-    const employees = db.prepare(`SELECT "id" FROM "Employee" ORDER BY "id" ASC`).all() as { id: number }[];
-    employeeIds = employees.map((e) => e.id);
-  }
+export async function populateEmployeeEmbeddingsFromCertificates(): Promise<number> {
+  const employeeIds = (db.prepare(`SELECT "id" FROM "Employee" ORDER BY "id" ASC`).all() as { id: number }[]).map((e) => e.id);
 
   const existingRows = db.prepare(`SELECT "employee_id" FROM "EmployeeEmbeddingVec"`).all() as { employee_id: bigint }[];
   const existingIds = new Set(existingRows.map((row) => Number(row.employee_id)));
@@ -142,10 +136,9 @@ export async function populateEmployeeEmbeddingsFromCertificates(targetEmployeeI
     employee_id: bigint;
   }[];
 
-  const dirtySet = new Set(allDirtyRecords.map((r) => Number(r.employee_id)));
   const dirtyIds =
     allDirtyRecords.length > 0
-      ? employeeIds.filter((id) => dirtySet.has(id))
+      ? allDirtyRecords.map((r) => Number(r.employee_id))
       : employeeIds;
 
   if (dirtyIds.length === 0) return 0;
