@@ -116,12 +116,18 @@ export function markEmployeeEmbeddingDirty(employeeId: number): void {
   }
 }
 
-export async function populateEmployeeEmbeddingsFromCertificates(): Promise<number> {
-  const employees = db.prepare(`SELECT "id" FROM "Employee" ORDER BY "id" ASC`).all() as { id: number }[];
+export async function populateEmployeeEmbeddingsFromCertificates(targetEmployeeIds?: number[]): Promise<number> {
+  let employeeIds: number[];
+  if (targetEmployeeIds) {
+    employeeIds = targetEmployeeIds;
+  } else {
+    const employees = db.prepare(`SELECT "id" FROM "Employee" ORDER BY "id" ASC`).all() as { id: number }[];
+    employeeIds = employees.map((e) => e.id);
+  }
 
   const existingRows = db.prepare(`SELECT "employee_id" FROM "EmployeeEmbeddingVec"`).all() as { employee_id: bigint }[];
   const existingIds = new Set(existingRows.map((row) => Number(row.employee_id)));
-  const missingEmployeeIds = employees.map((employee) => employee.id).filter((employeeId) => !existingIds.has(employeeId));
+  const missingEmployeeIds = employeeIds.filter((employeeId) => !existingIds.has(employeeId));
 
   if (missingEmployeeIds.length > 0) {
     const insertMissing = db.prepare(
@@ -132,12 +138,17 @@ export async function populateEmployeeEmbeddingsFromCertificates(): Promise<numb
     }
   }
 
-  const dirtyRecords = db.prepare(`SELECT "employee_id" FROM "EmployeeEmbeddingVec" WHERE "isdirty" = 1`).all() as {
+  const allDirtyRecords = db.prepare(`SELECT "employee_id" FROM "EmployeeEmbeddingVec" WHERE "isdirty" = 1`).all() as {
     employee_id: bigint;
   }[];
 
+  const dirtySet = new Set(allDirtyRecords.map((r) => Number(r.employee_id)));
   const dirtyIds =
-    dirtyRecords && dirtyRecords.length > 0 ? dirtyRecords.map((r) => Number(r.employee_id)) : employees.map((employee) => employee.id);
+    allDirtyRecords.length > 0
+      ? employeeIds.filter((id) => dirtySet.has(id))
+      : employeeIds;
+
+  if (dirtyIds.length === 0) return 0;
 
   const textMap = await getEmployeeCombinedCorpusMap(dirtyIds);
   let processedCount = 0;
@@ -155,6 +166,8 @@ export async function populateEmployeeEmbeddingsFromCertificates(): Promise<numb
     }
     batchMap.push({ employeeId, text });
   }
+
+  if (batchMap.length === 0) return 0;
 
   const texts = batchMap.map((e) => e.text);
   const embeddings = await embedTexts(texts);
