@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     const verificationCode = generateOtpCode();
     const codeExpiresAt = new Date(Date.now() + OTP_TTL_MS);
 
-    updateUser(user.id, { verificationCode, codeExpiresAt });
+    updateUser(user.id, { verificationCode, codeExpiresAt, verificationAttempts: 0 });
 
     await sendVerificationEmail(email, verificationCode);
 
