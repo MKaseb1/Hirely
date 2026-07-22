@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { db, inClause } from "./db";
 import { embedText } from "./embedding";
 import { embedTextsBGE } from "./bgeEmbedding";
+import { populateEmployeeEmbeddingsFromCertificates } from "./employeeCertificates";
 
 const SEMANTIC_WEIGHT = 0.7;
 const BM25_WEIGHT = 0.3;
@@ -254,6 +255,24 @@ export async function matchTopProfiles(
   }
 
   const { sql: idsSql, params: idsParams } = inClause(employeeIds);
+
+  // Inline sync-on-read: if any candidate embeddings are stale (isdirty = 1),
+  // re-embed them before scoring so the search always runs against fresh data.
+  const dirtyBefore = db.prepare(`
+    SELECT COUNT(*) AS cnt FROM "EmployeeEmbeddingVec"
+    WHERE "employee_id" IN ${idsSql} AND "isdirty" = 1
+  `).get(...idsParams) as { cnt: number } | undefined;
+  const dirtyCountBefore = dirtyBefore?.cnt ?? 0;
+
+  if (dirtyCountBefore > 0) {
+    try {
+      console.log(`Inline sync: re-embedding ${dirtyCountBefore} dirty candidate profiles`);
+      await populateEmployeeEmbeddingsFromCertificates();
+    } catch (syncError) {
+      console.error("Inline sync failed, continuing with existing data", syncError);
+    }
+  }
+
   const dbProfiles = db.prepare(`
     SELECT "employee_id", "allexperience", "embedding"
     FROM "EmployeeEmbeddingVec"
@@ -267,12 +286,6 @@ export async function matchTopProfiles(
   if (!dbProfiles || dbProfiles.length === 0) {
     return { results: [], pendingSyncCount: 0 };
   }
-
-  const pendingSyncCount = db.prepare(`
-    SELECT COUNT(*) AS cnt FROM "EmployeeEmbeddingVec"
-    WHERE "employee_id" IN ${idsSql} AND "isdirty" = 1
-  `).get(...idsParams) as { cnt: number } | undefined;
-  const dirtyCount = pendingSyncCount?.cnt ?? 0;
 
   const profileTexts = dbProfiles.map((p) => p.allexperience || "");
 
@@ -329,16 +342,7 @@ export async function matchTopProfiles(
     semanticDegraded,
   }));
 
-  // Candidate selection (which topN profiles make the cut) still comes from
-  // the fused BM25+semantic RRF ranking above. Only the display order within
-  // that selected set is re-sorted by relevanceScore, so what the UI shows
-  // top-to-bottom matches the percentages it prints.
   results.sort((a, b) => b.relevanceScore - a.relevanceScore);
 
-  // pendingSyncCount reports how many candidate profiles have isdirty = 1
-  // (stale or zero-vector embeddings that haven't been re-embedded yet).
-  // This is purely informational — no inline sync is triggered here.
-  // Dirty/new employees will score 0 until the next scheduled sync job runs.
-  // See scripts/run-embeddings.ts for the daily-job entry point.
-  return { results, pendingSyncCount: dirtyCount };
+  return { results, pendingSyncCount: dirtyCountBefore };
 }
