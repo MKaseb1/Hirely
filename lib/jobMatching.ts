@@ -263,7 +263,6 @@ export async function matchTopProfiles(
 
   if (dirtyCountBefore > 0) {
     try {
-      console.log(`Inline sync: re-embedding ${dirtyCountBefore} dirty profiles`);
       await populateEmployeeEmbeddingsFromCertificates();
     } catch (syncError) {
       console.error("Inline sync failed, continuing with existing data", syncError);
